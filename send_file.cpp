@@ -108,6 +108,54 @@ error:
     return 0;
 }
 
+static int server(int argc, char *argv[])
+{
+    int listen_sock, sock;
+    struct sockaddr_in addr;
+    char *buffer;
+    int r;
+
+    // Open listen connection on SERVER_PORT for 1 client
+    listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+    if(listen_sock == -1)
+    {
+	cerr << "Create socket error" << endl;
+	return -1;
+    }
+
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(SERVER_PORT);
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    r = bind(listen_sock, (struct sockaddr*)&addr, sizeof(addr));
+    if(r < 0)
+    {
+	cerr << "Bind error" << endl;
+	goto error;
+    }
+
+    r = listen(listen_sock, 1);
+    if(r < 0)
+    {
+	cerr << "Listen error" << endl;
+	goto error;
+    }
+
+    while(1)
+    {
+	sock = accept(listen_sock, NULL, NULL);
+	if(sock < 0)
+	{
+	    cerr << "Accept error" << endl;
+	    goto error;
+	}
+    }
+
+error:
+    close(listen_sock);
+    close(sock);
+}
+
 /* Send file to the specified IP address. In the received PC 
    this programm must be running in server mode. It receive file and 
    save with name [data]_[time].hex
