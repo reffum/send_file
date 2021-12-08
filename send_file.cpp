@@ -264,11 +264,11 @@ int main(int argc, char *argv[])
     // Mode
     const char *mode_str = argv[1];
 
-    if( strcmp(mode_str, "-s") )
+    if( !strcmp(mode_str, "-s") )
     {
 	mode = SERVER;
     }
-    else if( strcmp(mode_str, "-c"))
+    else if( !strcmp(mode_str, "-c"))
     {
 	mode = CLIENT;
     }
