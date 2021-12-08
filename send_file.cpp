@@ -40,12 +40,13 @@ static string getFileName()
 
     stringstream str;
 
-    str << timeinfo->tm_wday << "." 
+    str << timeinfo->tm_mday << "." 
 	<< timeinfo->tm_mon  << "."
-	<< timeinfo->tm_year << "_"
+	<< timeinfo->tm_year + 1900 << "_"
 	<< timeinfo->tm_hour << "."
 	<< timeinfo->tm_min  << "."
-	<< timeinfo->tm_sec;
+	<< timeinfo->tm_sec
+	<< ".hex";
 
     return str.str();
 }
@@ -154,6 +155,8 @@ static int server(int argc, char *argv[])
     char *buffer;
     int r;
 
+    buffer = new char[SEND_BLOCK_SIZE];
+    
     // Open listen connection on SERVER_PORT for 1 client
     listen_sock = socket(AF_INET, SOCK_STREAM, 0);
     if(listen_sock == -1)
@@ -172,7 +175,7 @@ static int server(int argc, char *argv[])
 	cerr << "Bind error" << endl;
 	goto error;
     }
-
+    
     while(1)
     {
 	r = listen(listen_sock, 1);
@@ -201,8 +204,6 @@ static int server(int argc, char *argv[])
 	    goto error;
 	}
 
-	buffer = new char[SEND_BLOCK_SIZE];
-
 	int readed = 0;
 	do
 	{
@@ -218,11 +219,18 @@ static int server(int argc, char *argv[])
 	} while(readed > 0);
 
 	/* Connection closed */
-	cout << "File " << filename << "received" << endl;
+	cout << "File " << filename << " received" << endl;
 	file.close();
     }
 
+    close(listen_sock);
+    close(sock);
+    delete buffer;
+
+    return 0;
+    
 error:
+    delete buffer;
     close(listen_sock);
     close(sock);
     return -1;
