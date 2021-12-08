@@ -2,12 +2,14 @@
 #include <cstring>
 #include <string>
 #include <fstream>
+#include <sstream>
 
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <signal.h>
 
 using namespace std;
 
@@ -15,6 +17,38 @@ using namespace std;
 const short SERVER_PORT = 10000;
 
 const int SEND_BLOCK_SIZE = 1024;
+
+/* CTRL+C handler */
+void sigingHandler(int signum)
+{
+	cout << "CTRL-C hapenned. Program exit" << endl;
+	exit(0);
+}
+
+/*
+ * Return file name for file in format:
+ * [data]_[time].hex
+ * Sample: 26.10.2021_12.02.54.hex
+ */
+static string getFileName()
+{
+    time_t rawtime;
+    struct tm * timeinfo;
+
+    time (&rawtime);
+    timeinfo = localtime (&rawtime);
+
+    stringstream str;
+
+    str << timeinfo->tm_wday << "." 
+	<< timeinfo->tm_mon  << "."
+	<< timeinfo->tm_year << "_"
+	<< timeinfo->tm_hour << "."
+	<< timeinfo->tm_min  << "."
+	<< timeinfo->tm_sec;
+
+    return str.str();
+}
 
 static void print_usage()
 {
@@ -99,13 +133,18 @@ static int client(int argc, char *argv[])
     }
 
     cout << "File transfere complete" << endl;
+
+    file.close();
+    close(sock);
+    delete buffer;
+    return 0;
 	
 error:
     file.close();
     close(sock);
     delete buffer;
 
-    return 0;
+    return -1;
 }
 
 static int server(int argc, char *argv[])
@@ -134,26 +173,59 @@ static int server(int argc, char *argv[])
 	goto error;
     }
 
-    r = listen(listen_sock, 1);
-    if(r < 0)
-    {
-	cerr << "Listen error" << endl;
-	goto error;
-    }
-
     while(1)
     {
+	r = listen(listen_sock, 1);
+	if(r < 0)
+	{
+	    cerr << "Listen error" << endl;
+	    goto error;
+	}
+
 	sock = accept(listen_sock, NULL, NULL);
 	if(sock < 0)
 	{
 	    cerr << "Accept error" << endl;
+	    continue;
+	}
+
+	// Create new file
+	string filename = getFileName();
+
+	fstream file;
+	file.open(filename, ios::binary | ios::out);
+
+	if(!file.is_open())
+	{
+	    cerr << "Open file error" << endl;
 	    goto error;
 	}
+
+	buffer = new char[SEND_BLOCK_SIZE];
+
+	int readed = 0;
+	do
+	{
+	    readed = recv(sock, buffer, SEND_BLOCK_SIZE, 0);
+
+	    if(readed < 0)
+	    {
+		cerr << "receive file error" << endl;
+		goto error;
+	    }
+
+	    file.write(buffer, readed);
+	} while(readed > 0);
+
+	/* Connection closed */
+	cout << "File " << filename << "received" << endl;
+	file.close();
     }
 
 error:
     close(listen_sock);
     close(sock);
+    return -1;
 }
 
 /* Send file to the specified IP address. In the received PC 
@@ -173,6 +245,8 @@ error:
  
 int main(int argc, char *argv[])
 {
+    signal(SIGINT, sigingHandler);
+    
     // Parameters
     enum {CLIENT, SERVER} mode;
 
@@ -211,8 +285,7 @@ int main(int argc, char *argv[])
     }
     else
     {
-	/* Server mode */
-	
+	return server(argc, argv);
     }
 	
     return 0;
